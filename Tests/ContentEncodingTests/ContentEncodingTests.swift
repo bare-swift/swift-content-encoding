@@ -206,3 +206,156 @@ struct ContentEncodingEncodeAPITests {
         #expect(v % 31 == 0)
     }
 }
+
+@Suite("ContentEncoding encode → decode round-trip")
+struct ContentEncodingRoundTripTests {
+    private static let sample = Bytes([
+        0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C, 0x20, 0x62, 0x61, 0x72, 0x65,
+        0x2D, 0x73, 0x77, 0x69, 0x66, 0x74, 0x21,
+    ])
+
+    @Test("gzip round-trip at all four levels")
+    func gzipAllLevels() throws {
+        for level: ContentEncoding.Level in [.none, .fast, .default, .best] {
+            let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: "gzip", level: level)
+            let back = try ContentEncoding.decode(encoded, contentEncoding: "gzip")
+            #expect(back.storage == Self.sample.storage,
+                    "gzip failed at \(level)")
+        }
+    }
+
+    @Test("x-gzip alias round-trips")
+    func xGzipAlias() throws {
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: "x-gzip")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "x-gzip")
+        #expect(back.storage == Self.sample.storage)
+    }
+
+    @Test("deflate round-trip at all four levels")
+    func deflateAllLevels() throws {
+        for level: ContentEncoding.Level in [.none, .fast, .default, .best] {
+            let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: "deflate", level: level)
+            let back = try ContentEncoding.decode(encoded, contentEncoding: "deflate")
+            #expect(back.storage == Self.sample.storage,
+                    "deflate failed at \(level)")
+        }
+    }
+
+    @Test("x-deflate alias round-trips")
+    func xDeflateAlias() throws {
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: "x-deflate")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "x-deflate")
+        #expect(back.storage == Self.sample.storage)
+    }
+
+    @Test("empty input round-trips through gzip")
+    func emptyGzip() throws {
+        let empty = Bytes()
+        let encoded = try ContentEncoding.encode(empty, contentEncoding: "gzip")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "gzip")
+        #expect(back.storage == empty.storage)
+    }
+
+    @Test("empty input round-trips through deflate")
+    func emptyDeflate() throws {
+        let empty = Bytes()
+        let encoded = try ContentEncoding.encode(empty, contentEncoding: "deflate")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "deflate")
+        #expect(back.storage == empty.storage)
+    }
+
+    @Test("case-insensitive coding match on encode")
+    func caseInsensitive() throws {
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: "GZIP")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "gzip")
+        #expect(back.storage == Self.sample.storage)
+    }
+}
+
+@Suite("ContentEncoding multi-coding")
+struct ContentEncodingMultiCodingTests {
+    private static let sample = Bytes([0x48, 0x69])
+
+    @Test("'gzip, deflate' encode then decode round-trips")
+    func gzipThenDeflate() throws {
+        let header = "gzip, deflate"
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: header)
+        let back = try ContentEncoding.decode(encoded, contentEncoding: header)
+        #expect(back.storage == Self.sample.storage)
+    }
+
+    @Test("'deflate, gzip' encode then decode round-trips")
+    func deflateThenGzip() throws {
+        let header = "deflate, gzip"
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: header)
+        let back = try ContentEncoding.decode(encoded, contentEncoding: header)
+        #expect(back.storage == Self.sample.storage)
+    }
+
+    @Test("'identity, gzip' encode then decode round-trips")
+    func identityThenGzip() throws {
+        let header = "identity, gzip"
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: header)
+        let back = try ContentEncoding.decode(encoded, contentEncoding: header)
+        #expect(back.storage == Self.sample.storage)
+    }
+
+    @Test("RFC 9110 § 8.4 ordering: encode left-to-right matches decoder reverse")
+    func leftToRightOrdering() throws {
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: "gzip, deflate")
+        #expect(encoded.storage[0] == 0x78,
+                "expected outer zlib framing; got 0x\(String(encoded.storage[0], radix: 16))")
+    }
+
+    @Test("whitespace-tolerant multi-coding parsing")
+    func whitespaceTolerant() throws {
+        let header = "  gzip  ,   deflate  "
+        let encoded = try ContentEncoding.encode(Self.sample, contentEncoding: header)
+        let back = try ContentEncoding.decode(encoded, contentEncoding: header)
+        #expect(back.storage == Self.sample.storage)
+    }
+}
+
+@Suite("ContentEncoding encode errors")
+struct ContentEncodingEncodeErrorTests {
+    @Test("'br' throws .unsupportedEncoding")
+    func brotliRejected() {
+        #expect(throws: ContentEncodingError.unsupportedEncoding("br")) {
+            try ContentEncoding.encode(Bytes([0x41]), contentEncoding: "br")
+        }
+    }
+
+    @Test("'zstd' throws .unsupportedEncoding")
+    func zstdRejected() {
+        #expect(throws: ContentEncodingError.unsupportedEncoding("zstd")) {
+            try ContentEncoding.encode(Bytes([0x41]), contentEncoding: "zstd")
+        }
+    }
+
+    @Test("unsupported coding anywhere in chain throws")
+    func unsupportedInChain() {
+        #expect(throws: ContentEncodingError.unsupportedEncoding("br")) {
+            try ContentEncoding.encode(Bytes([0x41]), contentEncoding: "gzip, br")
+        }
+    }
+}
+
+@Suite("v0.1 API stability — additive only")
+struct ContentEncodingV01StabilityTests {
+    @Test("decode round-trips with v0.2 encoder")
+    func decodeUnchanged() throws {
+        let input = Bytes([0x68, 0x65, 0x6C, 0x6C, 0x6F])
+        let encoded = try ContentEncoding.encode(input, contentEncoding: "gzip")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "gzip")
+        #expect(back.storage == input.storage)
+    }
+
+    @Test("ContentEncodingError v0.1 cases still present")
+    func errorCasesPresent() {
+        let e: ContentEncodingError = .unsupportedEncoding("test")
+        switch e {
+        case .unsupportedEncoding, .decodingFailed:
+            #expect(true)
+        }
+    }
+}
