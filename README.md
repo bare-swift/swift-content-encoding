@@ -1,6 +1,6 @@
 # swift-content-encoding
 
-HTTP `Content-Encoding` header multiplexer (identity, gzip, deflate) — Sendable, Foundation-free.
+HTTP `Content-Encoding` multiplexer — decoder (v0.1+) and encoder (v0.2+). Sendable, Foundation-free.
 
 Part of the [bare-swift](https://github.com/bare-swift) ecosystem.
 
@@ -9,7 +9,7 @@ Part of the [bare-swift](https://github.com/bare-swift) ecosystem.
 Add to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/bare-swift/swift-content-encoding.git", from: "0.1.0")
+.package(url: "https://github.com/bare-swift/swift-content-encoding.git", from: "0.2.0")
 ```
 
 Then depend on the `ContentEncoding` product:
@@ -20,6 +20,8 @@ Then depend on the `ContentEncoding` product:
 
 ## Usage
 
+### Decode (v0.1+)
+
 ```swift
 import ContentEncoding
 import Bytes
@@ -29,42 +31,56 @@ let header = "gzip"                   // from response Content-Encoding
 let plain = try ContentEncoding.decode(body, contentEncoding: header)
 ```
 
-## Scope
+### Encode (v0.2+)
 
-`swift-content-encoding` v0.1 routes HTTP `Content-Encoding` header values to swift-gzip / swift-zlib / passthrough:
+```swift
+import ContentEncoding
+import Bytes
 
-- **`identity`** — passthrough.
-- **`gzip`** and **`x-gzip`** (legacy alias) — RFC 1952 via swift-gzip.
-- **`deflate`** and **`x-deflate`** (legacy alias) — zlib-framed DEFLATE per RFC 7230 § 4.2.2, via swift-zlib. **Not** raw DEFLATE; if a non-conformant origin sends raw DEFLATE under `deflate`, reach for swift-deflate directly.
+let payload: Bytes = ...
+let body = try ContentEncoding.encode(payload, contentEncoding: "gzip", level: .default)
+// Round-trip: ContentEncoding.decode(body, contentEncoding: "gzip") == payload
+```
 
-Public API:
+Multi-coding works in both directions (encode applies left-to-right; decode reverses):
 
-- `ContentEncoding.decode(_ bytes: Bytes, contentEncoding header: String) throws(ContentEncodingError) -> Bytes` — parses the header, dispatches to the right codec, returns the plaintext.
-- `ContentEncodingError` typed-throws enum (`unsupportedEncoding(_:)`, `decodingFailed(_:)`).
+```swift
+let body = try ContentEncoding.encode(payload, contentEncoding: "gzip, deflate")
+let back = try ContentEncoding.decode(body, contentEncoding: "gzip, deflate")
+```
 
-**Multi-coding** values (`Content-Encoding: gzip, br`) are parsed and dispatched in reverse order per RFC 9110 § 8.4. An unsupported coding anywhere in the chain throws.
+## Supported codings (case-insensitive)
+
+- `identity` — passthrough.
+- `gzip` / `x-gzip` — RFC 1952 via swift-gzip.
+- `deflate` / `x-deflate` — zlib-framed DEFLATE per RFC 7230 § 4.2.2 via swift-zlib. **Not** raw DEFLATE.
+
+Unsupported codings (`br`, `zstd`, `compress`) throw `ContentEncodingError.unsupportedEncoding`.
+
+## Public API
+
+- `ContentEncoding.decode(_:contentEncoding:) throws(ContentEncodingError) -> Bytes`
+- `ContentEncoding.encode(_:contentEncoding:level:) throws(ContentEncodingError) -> Bytes`
+- `ContentEncoding.Level` — typealias for `Deflate.Encoder.Level` (`.none` / `.fast` / `.default` / `.best`).
+- `ContentEncodingError` typed-throws enum (2 cases).
 
 ## Dependencies
 
-- `swift-bytes` 0.1.0 — input/output buffer.
-- `swift-gzip` 0.1.0 — RFC 1952 decoder.
-- `swift-zlib` 0.1.0 — RFC 1950 decoder.
+- `swift-deflate` 0.2.0 — for the `Level` typealias.
+- `swift-gzip` 0.2.0 — gzip codec.
+- `swift-zlib` 0.2.0 — zlib codec.
+- `swift-bytes` 0.1.0 — buffer.
 
-## Out of scope for v0.1
+## Out of scope for v0.2
 
-- **Brotli** (`br`) — different algorithm; would require a separate package. Throws `.unsupportedEncoding("br")` until that lands.
-- **zstd** — defer.
-- **`compress`** (LZW) — historical, rare; defer.
-- **Encoder side.** Per RFC-0012's staging pattern, the encoder lands in v0.2 alongside swift-deflate's DEFLATE encoder.
-- `Codable` bridging — same Foundation-free / non-Codable differentiator as the rest of the ecosystem.
+- Brotli (`br`). Phase 10 candidate per RFC-0014.
+- zstd, compress.
+- Streaming encoding.
+- `Accept-Encoding` negotiation.
 
 ## Documentation
 
 Full DocC documentation: <https://bare-swift.github.io/swift-content-encoding/>
-
-## Source
-
-No upstream Rust crate; this is a native bare-swift package composing swift-gzip + swift-zlib.
 
 ## License
 

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-12
+
+### Added
+- `ContentEncoding.encode(_:contentEncoding:level:)` — mirror of the v0.1 decoder. Parses the header into a coding list and applies them left-to-right per RFC 9110 § 8.4. Supports `identity`, `gzip` / `x-gzip` (via swift-gzip v0.2), and `deflate` / `x-deflate` (via swift-zlib v0.2). Empty / whitespace-only header → passthrough.
+- `ContentEncoding.Level` typealias for `Deflate.Encoder.Level` — `.none` / `.fast` / `.default` / `.best`. Forwarded to the underlying codec; `identity` ignores it.
+- 22 new tests across 4 suites covering API surface, per-coding round-trip (gzip/x-gzip/deflate/x-deflate × four levels each), multi-coding round-trips (`gzip, deflate` / `deflate, gzip` / `identity, gzip` / whitespace-tolerant parsing), unsupported-coding errors (`br`, `zstd`, unsupported in chain), and v0.1 stability.
+
+### Changed
+- swift-gzip dep bumped from 0.1.0 to 0.2.0.
+- swift-zlib dep bumped from 0.1.0 to 0.2.0.
+- swift-deflate 0.2.0 added as a direct dep so the public `Level` typealias resolves cleanly without forcing consumers to `import Deflate`.
+
+### Unchanged from v0.1
+- `ContentEncoding.decode(_:contentEncoding:)` — bit-for-bit unchanged.
+- `ContentEncodingError` cases — both v0.1 cases preserved.
+- Coding multiplex semantics (case-insensitivity, whitespace handling, comma-separated tokens, `identity` passthrough).
+
+### Limitations (out of scope for v0.2)
+- Brotli (`br`), zstd (`zstd`), legacy compress (`compress`). Brotli is a Phase 10 candidate per RFC-0014.
+- Streaming encoding. v0.2 takes a single full `Bytes` input.
+- `Accept-Encoding` negotiation — separate concern; consumers compose at the request layer.
+
 ## [0.1.0] - 2026-05-10
 
 ### Added

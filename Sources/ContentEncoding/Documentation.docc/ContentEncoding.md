@@ -1,41 +1,45 @@
 # ``ContentEncoding``
 
-HTTP `Content-Encoding` header multiplexer (identity, gzip, deflate) — Sendable, Foundation-free.
+HTTP `Content-Encoding` multiplexer — decoder (v0.1+) and encoder (v0.2+). Sendable, Foundation-free.
 
 ## Overview
 
-`ContentEncoding.decode(_:contentEncoding:)` composes swift-gzip and
-swift-zlib behind a single header-driven entry point. Pass the raw HTTP
-response body and the `Content-Encoding` header value; the multiplexer
-parses the header, dispatches to the right codec, and returns the
-plaintext.
+`ContentEncoding` is a thin header-driven dispatch over the bare-swift compression tier (swift-gzip, swift-zlib). Pass a `Content-Encoding` header value and a `Bytes` payload; get back the encoded or decoded form.
 
 ```swift
 import ContentEncoding
 import Bytes
 
-let body: Bytes = ...                 // raw HTTP response body
-let header = "gzip"                   // from response Content-Encoding
-let plain = try ContentEncoding.decode(body, contentEncoding: header)
+// Encode at server side.
+let body = try ContentEncoding.encode(payload, contentEncoding: "gzip", level: .default)
+
+// Decode at client side.
+let back = try ContentEncoding.decode(body, contentEncoding: "gzip")
 ```
 
-Supported codings (case-insensitive):
+**Supported codings (case-insensitive):**
 
 - `identity` — passthrough.
-- `gzip` and the legacy alias `x-gzip` — RFC 1952 (via swift-gzip).
-- `deflate` and the legacy alias `x-deflate` — zlib-framed DEFLATE per
-  RFC 7230 § 4.2.2 (via swift-zlib).
+- `gzip` and the legacy alias `x-gzip` — RFC 1952.
+- `deflate` and the legacy alias `x-deflate` — zlib-framed DEFLATE per RFC 7230 § 4.2.2. Not raw DEFLATE.
 
-Unsupported codings (`br`, `zstd`, `compress`) throw
-``ContentEncodingError/unsupportedEncoding(_:)``.
+**Unsupported codings** (`br`, `zstd`, `compress`) throw ``ContentEncodingError/unsupportedEncoding(_:)``.
 
-Per RFC 9110 § 8.4, `Content-Encoding` is a comma-separated list with
-left-to-right encoding order, so decoding applies the codings in
-**reverse** order. Multi-coding is supported in v0.1; an unsupported
-coding anywhere in the chain throws.
+**Multi-coding** values (e.g. `Content-Encoding: gzip, deflate`) apply codings in declaration order at encode time (RFC 9110 § 8.4); decoding reverses the order.
+
+Per [RFC-0014](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0014-phase-9-anchor-compression-encoder-sweep.md), v0.2 commits to **correctness** — zopfli-style size tuning lands as v0.2.x patch releases.
 
 ## Topics
 
-### Essentials
+### Decode (v0.1+)
+
+- ``ContentEncoding/decode(_:contentEncoding:)``
+
+### Encode (v0.2+)
+
+- ``ContentEncoding/encode(_:contentEncoding:level:)``
+- ``ContentEncoding/Level``
+
+### Errors
 
 - ``ContentEncodingError``
