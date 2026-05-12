@@ -163,3 +163,46 @@ struct EndToEndTests {
         #expect(string(out) == "abc")
     }
 }
+
+@Suite("ContentEncoding.encode API surface")
+struct ContentEncodingEncodeAPITests {
+    @Test("Level typealias exists and exposes the four levels")
+    func levels() {
+        let levels: [ContentEncoding.Level] = [.none, .fast, .default, .best]
+        #expect(levels.count == 4)
+    }
+
+    @Test("encode with empty header is passthrough")
+    func emptyHeaderPassthrough() throws {
+        let input = Bytes([0x41, 0x42, 0x43])
+        let out = try ContentEncoding.encode(input, contentEncoding: "")
+        #expect(out.storage == input.storage)
+    }
+
+    @Test("encode with 'identity' is passthrough")
+    func identityPassthrough() throws {
+        let input = Bytes([0x41, 0x42, 0x43])
+        let out = try ContentEncoding.encode(input, contentEncoding: "identity")
+        #expect(out.storage == input.storage)
+    }
+
+    @Test("encode with 'gzip' starts with the gzip magic bytes")
+    func gzipMagic() throws {
+        let input = Bytes([0x41, 0x42, 0x43])
+        let out = try ContentEncoding.encode(input, contentEncoding: "gzip")
+        #expect(out.storage.count >= 3)
+        #expect(out.storage[0] == 0x1F)
+        #expect(out.storage[1] == 0x8B)
+        #expect(out.storage[2] == 0x08)
+    }
+
+    @Test("encode with 'deflate' starts with the zlib CMF (0x78)")
+    func deflateZlibFraming() throws {
+        let input = Bytes([0x41, 0x42, 0x43])
+        let out = try ContentEncoding.encode(input, contentEncoding: "deflate")
+        #expect(out.storage.count >= 2)
+        #expect(out.storage[0] == 0x78)
+        let v = (UInt32(out.storage[0]) << 8) | UInt32(out.storage[1])
+        #expect(v % 31 == 0)
+    }
+}

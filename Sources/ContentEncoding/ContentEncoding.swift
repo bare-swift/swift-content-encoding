@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The bare-swift Project Authors.
 
 import Bytes
+import Deflate
 import Gzip
 import Zlib
 
@@ -118,5 +119,53 @@ public enum ContentEncoding: Sendable {
             }
         }
         return out
+    }
+}
+
+extension ContentEncoding {
+    /// Compression level for `gzip` / `deflate` codings — typealias for
+    /// `Deflate.Encoder.Level`. `identity` ignores it.
+    public typealias Level = Deflate.Encoder.Level
+
+    /// Encode `bytes` per the `Content-Encoding` header value. An empty
+    /// or whitespace-only header is treated as `identity` (passthrough).
+    ///
+    /// Per RFC 9110 § 8.4, codings in a multi-coding header are applied
+    /// left-to-right at encode time (decoding reverses the list).
+    ///
+    /// Per [RFC-0014](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0014-phase-9-anchor-compression-encoder-sweep.md),
+    /// v0.2 commits to *correctness* — zopfli-style size tuning lands
+    /// as v0.2.x patch releases.
+    public static func encode(
+        _ bytes: Bytes,
+        contentEncoding header: String,
+        level: Level = .default
+    ) throws(ContentEncodingError) -> Bytes {
+        let codings = parseCodings(header)
+        if codings.isEmpty {
+            return bytes
+        }
+        var current = bytes
+        for coding in codings {
+            current = try applyEncode(coding: coding, to: current, level: level)
+        }
+        return current
+    }
+
+    private static func applyEncode(
+        coding: String,
+        to bytes: Bytes,
+        level: Level
+    ) throws(ContentEncodingError) -> Bytes {
+        switch coding {
+        case "identity":
+            return bytes
+        case "gzip", "x-gzip":
+            return Gzip.encode(bytes, level: level)
+        case "deflate", "x-deflate":
+            return Zlib.encode(bytes, level: level)
+        default:
+            throw .unsupportedEncoding(coding)
+        }
     }
 }
