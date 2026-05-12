@@ -54,8 +54,9 @@ let back = try ContentEncoding.decode(body, contentEncoding: "gzip, deflate")
 - `identity` — passthrough.
 - `gzip` / `x-gzip` — RFC 1952 via swift-gzip.
 - `deflate` / `x-deflate` — zlib-framed DEFLATE per RFC 7230 § 4.2.2 via swift-zlib. **Not** raw DEFLATE.
+- `br` — Brotli (RFC 7932) **decode-only** via swift-brotli. Encoding `br` throws `.unsupportedEncoding("br")` (the encoder ships with swift-brotli v0.2).
 
-Unsupported codings (`br`, `zstd`, `compress`) throw `ContentEncodingError.unsupportedEncoding`.
+Unsupported codings (`zstd`, `compress`) throw `ContentEncodingError.unsupportedEncoding`.
 
 ## Public API
 
@@ -69,11 +70,12 @@ Unsupported codings (`br`, `zstd`, `compress`) throw `ContentEncodingError.unsup
 - `swift-deflate` 0.2.0 — for the `Level` typealias.
 - `swift-gzip` 0.2.0 — gzip codec.
 - `swift-zlib` 0.2.0 — zlib codec.
+- `swift-brotli` 0.1.0 — Brotli decoder (v0.3+).
 - `swift-bytes` 0.1.0 — buffer.
 
-## Out of scope for v0.2
+## Out of scope for v0.3
 
-- Brotli (`br`). Phase 10 candidate per RFC-0014.
+- Brotli encoding. Lands when swift-brotli v0.2 ships.
 - zstd, compress.
 - Streaming encoding.
 - `Accept-Encoding` negotiation.

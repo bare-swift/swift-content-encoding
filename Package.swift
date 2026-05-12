@@ -15,7 +15,8 @@ let package = Package(
         .package(url: "https://github.com/bare-swift/swift-bytes.git", from: "0.1.0"),
         .package(url: "https://github.com/bare-swift/swift-deflate.git", from: "0.2.0"),
         .package(url: "https://github.com/bare-swift/swift-gzip.git", from: "0.2.0"),
-        .package(url: "https://github.com/bare-swift/swift-zlib.git", from: "0.2.0")
+        .package(url: "https://github.com/bare-swift/swift-zlib.git", from: "0.2.0"),
+        .package(url: "https://github.com/bare-swift/swift-brotli.git", from: "0.1.0")
     ],
     targets: [
         .target(
@@ -23,6 +24,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Bytes", package: "swift-bytes"),
                 .product(name: "Deflate", package: "swift-deflate"),
+                .product(name: "Brotli", package: "swift-brotli"),
                 .product(name: "Gzip", package: "swift-gzip"),
                 .product(name: "Zlib", package: "swift-zlib")
             ]

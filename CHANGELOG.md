@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-12
+
+### Added
+- **`br` (Brotli) decode** routed through swift-brotli 0.1.0. `Content-Encoding: br` and case-insensitive variants now decode end-to-end. Multi-coding chains containing `br` (e.g. `gzip, br` for decode) work.
+- 2 new tests covering `br` decode and case-insensitivity.
+
+### Changed
+- swift-brotli 0.1.0 added as a direct dep.
+
+### Unchanged from v0.2
+- `ContentEncoding.decode(_:contentEncoding:)` — bit-for-bit unchanged for non-`br` codings.
+- `ContentEncoding.encode(_:contentEncoding:level:)` — `br` is NOT yet supported on encode (swift-brotli v0.1 ships decoder-only); encoding `br` throws `.unsupportedEncoding("br")`. Encoder support arrives when swift-brotli v0.2 ships.
+- `ContentEncodingError` cases — both v0.1 cases preserved.
+
+### Limitations (out of scope for v0.3)
+- Brotli encoding. Lands when swift-brotli v0.2 ships.
+- zstd, compress.
+- Streaming encoding.
+
 ## [0.2.0] - 2026-05-12
 
 ### Added

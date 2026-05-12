@@ -112,17 +112,38 @@ struct SingleCodingTests {
         let out = try ContentEncoding.decode(bytes(gzipAbc), contentEncoding: "  gzip  ")
         #expect(string(out) == "abc")
     }
+
+    @Test("br (Brotli) decode via swift-brotli")
+    func brotli() throws {
+        // python brotli.compress(b"hello world") = 0x0B 0x05 0x80 ... 0x03
+        let helloBrotli: [UInt8] = [
+            0x0B, 0x05, 0x80, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x03,
+        ]
+        let out = try ContentEncoding.decode(bytes(helloBrotli), contentEncoding: "br")
+        #expect(string(out) == "hello world")
+    }
+
+    @Test("br uppercase header")
+    func brotliUppercase() throws {
+        let helloBrotli: [UInt8] = [
+            0x0B, 0x05, 0x80, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x03,
+        ]
+        let out = try ContentEncoding.decode(bytes(helloBrotli), contentEncoding: "BR")
+        #expect(string(out) == "hello world")
+    }
 }
 
 @Suite("Decode — error paths")
 struct ErrorPathsTests {
     @Test("unsupported coding throws")
     func unsupported() {
-        #expect(throws: ContentEncodingError.unsupportedEncoding("br")) {
-            try ContentEncoding.decode(bytes([0, 1, 2]), contentEncoding: "br")
-        }
+        // 'br' became supported in v0.3 (via swift-brotli). 'zstd' and
+        // 'compress' remain unsupported.
         #expect(throws: ContentEncodingError.unsupportedEncoding("zstd")) {
             try ContentEncoding.decode(bytes([0, 1, 2]), contentEncoding: "zstd")
+        }
+        #expect(throws: ContentEncodingError.unsupportedEncoding("compress")) {
+            try ContentEncoding.decode(bytes([0, 1, 2]), contentEncoding: "compress")
         }
     }
 
@@ -139,8 +160,8 @@ struct ErrorPathsTests {
     func multiCodingUnsupported() {
         // Even if the outer payload could decode, an unsupported
         // intermediate coding fails fast.
-        #expect(throws: ContentEncodingError.unsupportedEncoding("br")) {
-            try ContentEncoding.decode(bytes(gzipAbc), contentEncoding: "gzip, br")
+        #expect(throws: ContentEncodingError.unsupportedEncoding("zstd")) {
+            try ContentEncoding.decode(bytes(gzipAbc), contentEncoding: "gzip, zstd")
         }
     }
 }

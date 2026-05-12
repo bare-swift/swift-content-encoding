@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The bare-swift Project Authors.
 
 import Bytes
+import Brotli
 import Deflate
 import Gzip
 import Zlib
@@ -74,6 +75,12 @@ public enum ContentEncoding: Sendable {
                 return try Zlib.decode(bytes)
             } catch {
                 throw .decodingFailed("deflate: \(error)")
+            }
+        case "br":
+            do {
+                return try Brotli.decode(bytes)
+            } catch {
+                throw .decodingFailed("br: \(error)")
             }
         default:
             throw .unsupportedEncoding(coding)
