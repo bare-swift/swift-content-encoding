@@ -16,7 +16,7 @@ let package = Package(
         .package(url: "https://github.com/bare-swift/swift-deflate.git", from: "0.2.0"),
         .package(url: "https://github.com/bare-swift/swift-gzip.git", from: "0.2.0"),
         .package(url: "https://github.com/bare-swift/swift-zlib.git", from: "0.2.0"),
-        .package(url: "https://github.com/bare-swift/swift-brotli.git", from: "0.1.0")
+        .package(url: "https://github.com/bare-swift/swift-brotli.git", from: "0.2.0")
     ],
     targets: [
         .target(

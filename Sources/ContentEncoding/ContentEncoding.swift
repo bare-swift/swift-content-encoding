@@ -171,6 +171,16 @@ extension ContentEncoding {
             return Gzip.encode(bytes, level: level)
         case "deflate", "x-deflate":
             return Zlib.encode(bytes, level: level)
+        case "br":
+            // swift-brotli v0.2 takes a `Quality` (0..11) rather than a
+            // Deflate.Level (0..9). v0.4 uses `.default` (level 6) always;
+            // the `level` parameter is ignored for `br`. A future v0.5 may
+            // map Level → Quality if adopter demand surfaces.
+            do {
+                return try Brotli.compress(bytes)
+            } catch {
+                throw .encodingFailed("br: \(error)")
+            }
         default:
             throw .unsupportedEncoding(coding)
         }

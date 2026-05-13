@@ -339,13 +339,6 @@ struct ContentEncodingMultiCodingTests {
 
 @Suite("ContentEncoding encode errors")
 struct ContentEncodingEncodeErrorTests {
-    @Test("'br' throws .unsupportedEncoding")
-    func brotliRejected() {
-        #expect(throws: ContentEncodingError.unsupportedEncoding("br")) {
-            try ContentEncoding.encode(Bytes([0x41]), contentEncoding: "br")
-        }
-    }
-
     @Test("'zstd' throws .unsupportedEncoding")
     func zstdRejected() {
         #expect(throws: ContentEncodingError.unsupportedEncoding("zstd")) {
@@ -355,9 +348,28 @@ struct ContentEncodingEncodeErrorTests {
 
     @Test("unsupported coding anywhere in chain throws")
     func unsupportedInChain() {
-        #expect(throws: ContentEncodingError.unsupportedEncoding("br")) {
-            try ContentEncoding.encode(Bytes([0x41]), contentEncoding: "gzip, br")
+        #expect(throws: ContentEncodingError.unsupportedEncoding("compress")) {
+            try ContentEncoding.encode(Bytes([0x41]), contentEncoding: "gzip, compress")
         }
+    }
+}
+
+@Suite("ContentEncoding br encode (v0.4)")
+struct ContentEncodingBrEncodeTests {
+    @Test("br encode produces a valid brotli stream that decodes back")
+    func brRoundTrip() throws {
+        let input = Bytes(Array("Lorem ipsum dolor sit amet. ".utf8))
+        let encoded = try ContentEncoding.encode(input, contentEncoding: "br")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "br")
+        #expect(back.storage == input.storage)
+    }
+
+    @Test("br appears at end of chain (gzip, br) round-trips")
+    func brInChain() throws {
+        let input = Bytes(Array("Hello, world!".utf8))
+        let encoded = try ContentEncoding.encode(input, contentEncoding: "gzip, br")
+        let back = try ContentEncoding.decode(encoded, contentEncoding: "gzip, br")
+        #expect(back.storage == input.storage)
     }
 }
 
@@ -371,11 +383,11 @@ struct ContentEncodingV01StabilityTests {
         #expect(back.storage == input.storage)
     }
 
-    @Test("ContentEncodingError v0.1 cases still present")
+    @Test("ContentEncodingError cases (v0.4 adds encodingFailed)")
     func errorCasesPresent() {
         let e: ContentEncodingError = .unsupportedEncoding("test")
         switch e {
-        case .unsupportedEncoding, .decodingFailed:
+        case .unsupportedEncoding, .decodingFailed, .encodingFailed:
             #expect(true)
         }
     }

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-13
+
+### Added
+- **`br` (Brotli) encode** via swift-brotli 0.2.0's encoder. `ContentEncoding.encode(_:contentEncoding:level:)` now accepts `br` (and multi-coding chains containing `br`). Closes symmetric encode/decode story across all five web codings (identity / gzip / deflate / br + raw deflate via swift-deflate direct).
+- `ContentEncodingError.encodingFailed(String)` case for encoder-side errors (additive; existing switch consumers must extend their exhaustive match).
+- 2 new tests covering `br` encode round-trip and `br` in encode chain.
+
+### Changed
+- swift-brotli dep bumped 0.1.0 → 0.2.0 (encoder added in upstream's v0.2).
+
+### Notes
+- The `level` parameter is ignored for `br` — v0.4 always uses brotli `.default` quality (level 6). Map Level → brotli Quality in a future v0.5 if adopter demand surfaces.
+- swift-brotli v0.2's encoder produces valid brotli streams but does NOT match the reference encoder's compression ratio. See swift-brotli v0.2 CHANGELOG for the explicit non-goals list.
+
+### Unchanged from v0.3
+- Decode path bit-for-bit unchanged.
+
 ## [0.3.0] - 2026-05-12
 
 ### Added
