@@ -1,6 +1,6 @@
 # swift-content-encoding
 
-HTTP `Content-Encoding` multiplexer — decoder (v0.1+) and encoder (v0.2+). Sendable, Foundation-free.
+HTTP `Content-Encoding` multiplexer — decoder (v0.1+) + one-shot encoder (v0.2+) + streaming encoder for single-coding bodies (v0.5+). Sendable, Foundation-free.
 
 Part of the [bare-swift](https://github.com/bare-swift) ecosystem.
 
@@ -9,7 +9,7 @@ Part of the [bare-swift](https://github.com/bare-swift) ecosystem.
 Add to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/bare-swift/swift-content-encoding.git", from: "0.2.0")
+.package(url: "https://github.com/bare-swift/swift-content-encoding.git", from: "0.5.0")
 ```
 
 Then depend on the `ContentEncoding` product:
@@ -48,6 +48,35 @@ Multi-coding works in both directions (encode applies left-to-right; decode reve
 let body = try ContentEncoding.encode(payload, contentEncoding: "gzip, deflate")
 let back = try ContentEncoding.decode(body, contentEncoding: "gzip, deflate")
 ```
+
+### Streaming encode (v0.5+, single-coding only)
+
+```swift
+import ContentEncoding
+import Bytes
+
+var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "gzip", level: .default)
+encoder.update(chunk1)
+encoder.update(chunk2)
+let body = try encoder.finish()
+let plain = try ContentEncoding.decode(body, contentEncoding: "gzip")
+// plain == chunk1 + chunk2
+```
+
+The streaming encoder dispatches to the canonical streaming encoders in
+swift-gzip / swift-zlib / swift-brotli per the configured coding.
+Empty / whitespace header and `identity` coding buffer and return at
+`finish()`.
+
+**Multi-coding headers (e.g. `"gzip, br"`) throw
+`ContentEncodingError.multipleCodingsNotStreamable` at init.** The
+underlying streaming encoders emit bytes only at `finish()`, not
+incrementally during `update(_:)`, so composing them in a chain would
+require buffering each encoder's full output before feeding it to the
+next. Multi-coding streaming is a v0.6+ candidate that depends on a
+coordinated codec-tier `drain()` API addition. For multi-coding bodies,
+buffer the input and use the v0.4 one-shot `ContentEncoding.encode(...)`
+path.
 
 ## Supported codings (case-insensitive)
 

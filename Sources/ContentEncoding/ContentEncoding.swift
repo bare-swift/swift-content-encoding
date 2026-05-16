@@ -186,3 +186,9 @@ extension ContentEncoding {
         }
     }
 }
+
+extension ContentEncoding {
+    /// Streaming encoder namespace (v0.5+). For one-shot compression of
+    /// bounded inputs, use ``ContentEncoding/encode(_:contentEncoding:level:)``.
+    public enum Streaming: Sendable {}
+}

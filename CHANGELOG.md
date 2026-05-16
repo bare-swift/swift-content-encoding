@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-05-16
+
+### Added
+- **Streaming encoder** — `ContentEncoding.Streaming.Encoder(contentEncoding:level:) throws` / `update(_:)` / `finish() throws -> Bytes`. Dispatches to the streaming encoders in swift-gzip / swift-zlib / swift-brotli (all v0.3+) per the configured coding. Empty / whitespace header and `identity` coding buffer and return verbatim at `finish()`.
+- `ContentEncoding.Streaming` public namespace enum.
+- `ContentEncodingError.multipleCodingsNotStreamable(String)` — thrown at init when the header contains multiple codings.
+- `ContentEncodingError.encoderFinished` — thrown when `finish()` is called on an already-finished encoder.
+- 18 new tests covering per-coding round-trip (identity / gzip / x-gzip / deflate / x-deflate / br), multi-chunk feeds, level coverage, multi-coding-throws, unsupported-coding errors, and double-finish / update-after-finish edge cases.
+
+### Multi-coding limitation
+- v0.5 streaming supports **single-coding only**. Multi-coding chains like `"gzip, br"` throw `ContentEncodingError.multipleCodingsNotStreamable` at init.
+- The underlying streaming encoders in swift-gzip / swift-zlib / swift-brotli emit output bytes only at `finish()`, not during `update(_:)`. Composing them in a chain would require buffering each encoder's full output before feeding it to the next — defeating the streaming purpose. A coordinated codec-tier `drain() -> Bytes` API is a Phase 26+ candidate that would unblock multi-coding streaming in a future v0.6.
+- For multi-coding bodies, callers should buffer the input and use the v0.4 one-shot `ContentEncoding.encode(_:contentEncoding:level:)` path.
+
+### Dependencies
+- swift-gzip dep bumped 0.2.0 → 0.3.0 (for `Gzip.Streaming.Encoder`).
+- swift-zlib dep bumped 0.2.0 → 0.3.0 (for `Zlib.Streaming.Encoder`).
+- swift-brotli dep bumped 0.2.0 → 0.3.0 (for `Brotli.Streaming.Encoder`).
+- swift-deflate dep unchanged (not used directly).
+
+### Migration (v0.4 → v0.5)
+- **Additive only — non-breaking.** All v0.4 APIs unchanged.
+- `ContentEncoding.encode(_:contentEncoding:level:)` continues byte-equal output.
+- `ContentEncoding.decode(_:contentEncoding:)` unchanged from v0.1.
+- `ContentEncodingError` adds 2 new cases (additive; existing cases unchanged).
+
+### Out of scope (deferred to v0.6+)
+- **Multi-coding streaming chains.** Requires Phase 26+ codec-tier `drain()` API.
+- **Streaming decode.** No codec package has streaming decode yet.
+- **`reset()` for encoder reuse.**
+- **Explicit flush API.**
+- **Level → brotli Quality mapping.** v0.5 `br` streaming ignores `level` (uses brotli `.default` quality), matching v0.4 one-shot behavior.
+
+### Phase 25
+- Tranche 25A of [RFC-0030](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0030-phase-25-anchor-swift-content-encoding-v0.5-streaming.md). Wires the codec-tier streaming sweep (Phase 22-24) through the HTTP `Content-Encoding` layer for single-coding bodies.
+
 ## [0.4.0] - 2026-05-13
 
 ### Added

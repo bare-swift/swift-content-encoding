@@ -387,7 +387,8 @@ struct ContentEncodingV01StabilityTests {
     func errorCasesPresent() {
         let e: ContentEncodingError = .unsupportedEncoding("test")
         switch e {
-        case .unsupportedEncoding, .decodingFailed, .encodingFailed:
+        case .unsupportedEncoding, .decodingFailed, .encodingFailed,
+             .multipleCodingsNotStreamable, .encoderFinished:
             #expect(true)
         }
     }

@@ -15,4 +15,14 @@ public enum ContentEncodingError: Error, Equatable, Sendable {
     /// Underlying encoder rejected the input. The string is a
     /// best-effort description (added in v0.4 alongside `br` encode).
     case encodingFailed(String)
+
+    /// Streaming encoder: header carried multiple codings (e.g. "gzip, br").
+    /// v0.5 streaming supports single-coding only. Fall back to
+    /// ``ContentEncoding/encode(_:contentEncoding:level:)`` one-shot for
+    /// multi-coding chains.
+    case multipleCodingsNotStreamable(String)
+
+    /// Encoder: ``ContentEncoding/Streaming/Encoder/finish()`` was called
+    /// twice on the same encoder.
+    case encoderFinished
 }
