@@ -1,6 +1,6 @@
 # swift-content-encoding
 
-HTTP `Content-Encoding` multiplexer — decoder (v0.1+) + one-shot encoder (v0.2+) + streaming encoder for single-coding bodies (v0.5+). Sendable, Foundation-free.
+HTTP `Content-Encoding` multiplexer — decoder (v0.1+) + one-shot encoder (v0.2+) + streaming encoder (v0.5 single-coding, v0.6 multi-coding). Sendable, Foundation-free.
 
 Part of the [bare-swift](https://github.com/bare-swift) ecosystem.
 
@@ -9,7 +9,7 @@ Part of the [bare-swift](https://github.com/bare-swift) ecosystem.
 Add to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/bare-swift/swift-content-encoding.git", from: "0.5.0")
+.package(url: "https://github.com/bare-swift/swift-content-encoding.git", from: "0.6.0")
 ```
 
 Then depend on the `ContentEncoding` product:
@@ -49,7 +49,7 @@ let body = try ContentEncoding.encode(payload, contentEncoding: "gzip, deflate")
 let back = try ContentEncoding.decode(body, contentEncoding: "gzip, deflate")
 ```
 
-### Streaming encode (v0.5+, single-coding only)
+### Streaming encode (v0.5+ single-coding, v0.6+ multi-coding)
 
 ```swift
 import ContentEncoding
@@ -68,15 +68,26 @@ swift-gzip / swift-zlib / swift-brotli per the configured coding.
 Empty / whitespace header and `identity` coding buffer and return at
 `finish()`.
 
-**Multi-coding headers (e.g. `"gzip, br"`) throw
-`ContentEncodingError.multipleCodingsNotStreamable` at init.** The
-underlying streaming encoders emit bytes only at `finish()`, not
-incrementally during `update(_:)`, so composing them in a chain would
-require buffering each encoder's full output before feeding it to the
-next. Multi-coding streaming is a v0.6+ candidate that depends on a
-coordinated codec-tier `drain()` API addition. For multi-coding bodies,
-buffer the input and use the v0.4 one-shot `ContentEncoding.encode(...)`
-path.
+**Multi-coding headers (v0.6+)** stream correctly via cascaded
+`drain()` calls on the underlying v0.4+ codec streaming encoders:
+
+```swift
+var encoder = try ContentEncoding.Streaming.Encoder(
+    contentEncoding: "gzip, br", level: .default
+)
+encoder.update(chunk1)
+encoder.update(chunk2)
+let compressed = try encoder.finish()
+let plain = try ContentEncoding.decode(compressed, contentEncoding: "gzip, br")
+```
+
+Per RFC 9110 § 8.4, codings apply left-to-right at encode time — so
+`"gzip, br"` means input → gzip-encode → br-encode → output; the
+decoder reverses to br-decode → gzip-decode.
+
+(v0.5 threw `ContentEncodingError.multipleCodingsNotStreamable` for
+multi-coding; v0.6 supports it. The error case is kept in the enum
+for backwards-compat but is no longer thrown.)
 
 ## Supported codings (case-insensitive)
 

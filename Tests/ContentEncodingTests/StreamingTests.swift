@@ -141,29 +141,103 @@ struct StreamingTests {
         #expect(Array(plain.storage) == Array(payload.storage))
     }
 
-    // MARK: - Multi-coding throws
+    // MARK: - Multi-coding streaming (v0.6+)
 
-    @Test("multi-coding 'gzip, br' throws multipleCodingsNotStreamable at init")
-    func multiCodingGzipBrThrows() {
+    @Test("multi-coding 'gzip, br' round-trips via cascaded decode")
+    func multiCodingGzipBr() throws {
+        let payload = Self.bytesFromString("hello multi-coding world hello multi-coding world")
+        var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "gzip, br")
+        encoder.update(payload)
+        let compressed = try encoder.finish()
+        let plain = try ContentEncoding.decode(compressed, contentEncoding: "gzip, br")
+        #expect(Array(plain.storage) == Array(payload.storage))
+    }
+
+    @Test("multi-coding 'br, gzip' round-trips")
+    func multiCodingBrGzip() throws {
+        let payload = Self.bytesFromString("hello multi-coding")
+        var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "br, gzip")
+        encoder.update(payload)
+        let compressed = try encoder.finish()
+        let plain = try ContentEncoding.decode(compressed, contentEncoding: "br, gzip")
+        #expect(Array(plain.storage) == Array(payload.storage))
+    }
+
+    @Test("multi-coding 'deflate, gzip' round-trips")
+    func multiCodingDeflateGzip() throws {
+        let payload = Self.bytesFromString("zlib then gzip chain")
+        var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "deflate, gzip")
+        encoder.update(payload)
+        let compressed = try encoder.finish()
+        let plain = try ContentEncoding.decode(compressed, contentEncoding: "deflate, gzip")
+        #expect(Array(plain.storage) == Array(payload.storage))
+    }
+
+    @Test("3-coding chain 'gzip, deflate, br' round-trips")
+    func multiCodingThreeStage() throws {
+        let payload = Self.bytesFromString("three-stage cascade test payload")
+        var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "gzip, deflate, br")
+        encoder.update(payload)
+        let compressed = try encoder.finish()
+        let plain = try ContentEncoding.decode(compressed, contentEncoding: "gzip, deflate, br")
+        #expect(Array(plain.storage) == Array(payload.storage))
+    }
+
+    @Test("'identity, gzip' equals pure gzip decoded output")
+    func multiCodingIdentityGzip() throws {
+        let payload = Self.bytesFromString("identity-then-gzip test")
+        var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "identity, gzip")
+        encoder.update(payload)
+        let compressed = try encoder.finish()
+        let plain = try ContentEncoding.decode(compressed, contentEncoding: "identity, gzip")
+        #expect(Array(plain.storage) == Array(payload.storage))
+    }
+
+    @Test("'gzip, identity' equals pure gzip decoded output")
+    func multiCodingGzipIdentity() throws {
+        let payload = Self.bytesFromString("gzip-then-identity test")
+        var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "gzip, identity")
+        encoder.update(payload)
+        let compressed = try encoder.finish()
+        let plain = try ContentEncoding.decode(compressed, contentEncoding: "gzip, identity")
+        #expect(Array(plain.storage) == Array(payload.storage))
+    }
+
+    @Test("multi-coding with two chunks round-trips to concatenation")
+    func multiCodingTwoChunks() throws {
+        let chunk1 = Self.bytesFromString("hel")
+        let chunk2 = Self.bytesFromString("lo")
+        var encoder = try ContentEncoding.Streaming.Encoder(contentEncoding: "gzip, br")
+        encoder.update(chunk1)
+        encoder.update(chunk2)
+        let compressed = try encoder.finish()
+        let plain = try ContentEncoding.decode(compressed, contentEncoding: "gzip, br")
+        #expect(Array(plain.storage) == Array("hello".utf8))
+    }
+
+    @Test("multi-coding 'gzip, zstd' (unsupported in pipeline) throws unsupportedEncoding")
+    func multiCodingUnsupportedInPipeline() {
         do {
-            _ = try ContentEncoding.Streaming.Encoder(contentEncoding: "gzip, br")
+            _ = try ContentEncoding.Streaming.Encoder(contentEncoding: "gzip, zstd")
             Issue.record("expected throw")
-        } catch ContentEncodingError.multipleCodingsNotStreamable(let header) {
-            #expect(header == "gzip, br")
+        } catch ContentEncodingError.unsupportedEncoding(let coding) {
+            #expect(coding == "zstd")
         } catch {
             Issue.record("unexpected error: \(error)")
         }
     }
 
-    @Test("multi-coding 'deflate, gzip' throws")
-    func multiCodingDeflateGzipThrows() {
-        do {
-            _ = try ContentEncoding.Streaming.Encoder(contentEncoding: "deflate, gzip")
-            Issue.record("expected throw")
-        } catch ContentEncodingError.multipleCodingsNotStreamable {
-            // expected
-        } catch {
-            Issue.record("unexpected error: \(error)")
+    @Test("multipleCodingsNotStreamable case is still defined (backwards-compat)")
+    func multipleCodingsNotStreamableCaseStillDefined() {
+        // The error case is kept in the enum for backwards-compat with v0.5
+        // callers; v0.6 does not throw it. This test just verifies the case
+        // is still pattern-matchable.
+        let e: ContentEncodingError = .multipleCodingsNotStreamable("test")
+        switch e {
+        case .multipleCodingsNotStreamable(let header):
+            #expect(header == "test")
+        default:
+            Issue.record("expected .multipleCodingsNotStreamable")
         }
     }
 

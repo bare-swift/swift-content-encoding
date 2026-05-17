@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-05-17
+
+### Added
+- **Multi-coding streaming** — `ContentEncoding.Streaming.Encoder(contentEncoding:level:)` now supports multi-coding headers (e.g., `"gzip, br"`, `"deflate, gzip"`, `"gzip, deflate, br"`). Builds a cascaded pipeline of inner streaming encoders applied left-to-right at encode time per RFC 9110 § 8.4. Each `update(_:)` cascades chunks through the pipeline via `drain()` calls on the underlying v0.4 codec encoders; `finish()` cascades finalization in order.
+- 9 new tests covering 2-coding round-trips (`"gzip, br"`, `"br, gzip"`, `"deflate, gzip"`), 3-coding chain (`"gzip, deflate, br"`), identity-in-chain (`"identity, gzip"`, `"gzip, identity"`), multi-chunk multi-coding, unsupported-coding-in-pipeline, and backwards-compat of `.multipleCodingsNotStreamable` enum case.
+
+### Changed
+- v0.5's behavior of throwing `ContentEncodingError.multipleCodingsNotStreamable` at init for multi-coding headers is **removed**. Multi-coding now works.
+- Internal: `InnerEncoder` single-stage enum replaced with `[InnerCoding]` array (ordered pipeline).
+- Identity coding in v0.6 is implemented as a buffering passthrough stage so it composes uniformly with other codings in cascades.
+
+### Backwards compatibility
+- **`ContentEncodingError.multipleCodingsNotStreamable` case is preserved in the enum.** v0.5 callers that pattern-match this case continue to compile. v0.6 simply no longer throws it for valid multi-coding headers. Callers can remove their catch-and-fall-back-to-one-shot logic for this case.
+- Single-coding behavior (gzip, x-gzip, deflate, x-deflate, br, identity, empty header) is byte-for-byte preserved from v0.5 (regression-tested via per-coding round-trip tests).
+
+### Dependencies
+- swift-gzip dep bumped 0.3.0 → 0.4.0 (for `Gzip.Streaming.Encoder.drain()`).
+- swift-zlib dep bumped 0.3.0 → 0.4.0 (for `Zlib.Streaming.Encoder.drain()`).
+- swift-brotli dep bumped 0.3.0 → 0.4.0 (for `Brotli.Streaming.Encoder.drain()`).
+- swift-deflate dep unchanged.
+
+### Migration (v0.5 → v0.6)
+- **Additive only — non-breaking.** All v0.5 APIs unchanged.
+- Multi-coding headers that previously threw `.multipleCodingsNotStreamable` now work. Callers catching this error case can remove the catch (the fall-back path to v0.4 one-shot is no longer needed).
+- `ContentEncoding.encode(_:contentEncoding:level:)` v0.4 one-shot path continues to work byte-for-byte unchanged.
+- `ContentEncoding.decode(_:contentEncoding:)` unchanged from v0.1.
+- `ContentEncodingError` cases unchanged (5 total; `.multipleCodingsNotStreamable` kept for backwards-compat).
+
+### Out of scope (deferred to v0.7+)
+- Streaming decode (depends on streaming decoders in codec packages — Phase 29+).
+- `reset()` for encoder reuse.
+- Explicit flush API.
+- Level → brotli Quality mapping (still uses `.default` quality for br).
+
+### Phase 28
+- Tranche 28A of [RFC-0033](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0033-phase-28-anchor-content-encoding-v0.6-multi-coding-streaming.md). Completes the streaming HTTP body story (encode side) by wiring Phase 27's codec-tier `drain()` API through the HTTP Content-Encoding layer.
+
 ## [0.5.0] — 2026-05-16
 
 ### Added
