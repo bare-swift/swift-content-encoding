@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-05-18
+
+### Inherited (partial propagation)
+- **True memory-streaming inflate for deflate/gzip/zlib codings via codec v0.6.** swift-deflate, swift-gzip, and swift-zlib all bumped to v0.6 in v0.8. `ContentEncoding.Streaming.Decoder` configurations using `gzip`, `x-gzip`, `deflate`, `x-deflate`, or `identity` codings (including multi-coding chains composed entirely of these) now run with true memory-streaming inflate underneath. Adopters get this for free via dep bump — zero code changes; public API surface byte-for-byte preserved.
+
+### Partial-propagation acknowledgment
+- **`br` (brotli) coding remains buffering-wrap.** swift-brotli is intentionally pinned at v0.5 in v0.8 — brotli true memory-streaming inflate is a separate state-machine refactor (Phase 36+ candidate; brotli's Decoder is more complex than deflate's Inflater). Multi-coding chains that include `br` (e.g. `"gzip, br"`, `"br, gzip"`) still buffer through the brotli stage; the deflate/gzip/zlib stages of those chains are true-memory-streaming, but the chain as a whole is buffering until the brotli stage produces its complete output at finish().
+- **Memory implication:** for a `"gzip, br"`-encoded body of size N, v0.8 holds at most N compressed bytes in memory during decode (in the brotli stage's buffer) plus the deflate-streamed gzip-decoded output (which itself doesn't buffer). v0.7 held the brotli-decoded gzip-encoded intermediate too. v0.9 (post-brotli-v0.6) will eliminate the brotli-stage buffer.
+
+### Internal
+- swift-deflate dep floor: 0.5.0 → 0.6.0.
+- swift-gzip dep floor: 0.5.0 → 0.6.0.
+- swift-zlib dep floor: 0.5.0 → 0.6.0.
+- swift-brotli dep floor: 0.5.0 (unchanged; Phase 36+ candidate).
+- Public API surface byte-for-byte unchanged. All 91 v0.7 tests pass without modification.
+
+### Migration (v0.7 → v0.8)
+- **Additive only — non-breaking.** All v0.1-v0.7 APIs unchanged.
+
+### Phase 35
+- Tranche 35C of [RFC-0040](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0040-phase-35-anchor-downstream-propagation-sweep.md). Downstream propagation sweep — bumps deflate/gzip/zlib deps to inherit Phase 34's true memory-streaming inflate. **Partial-propagation acknowledgment** for brotli — codifies new sub-pattern.
+
 ## [0.7.0] — 2026-05-18
 
 ### Added

@@ -13,9 +13,14 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.0"),
         .package(url: "https://github.com/bare-swift/swift-bytes.git", from: "0.1.0"),
-        .package(url: "https://github.com/bare-swift/swift-deflate.git", from: "0.5.0"),
-        .package(url: "https://github.com/bare-swift/swift-gzip.git", from: "0.5.0"),
-        .package(url: "https://github.com/bare-swift/swift-zlib.git", from: "0.5.0"),
+        .package(url: "https://github.com/bare-swift/swift-deflate.git", from: "0.6.0"),
+        .package(url: "https://github.com/bare-swift/swift-gzip.git", from: "0.6.0"),
+        .package(url: "https://github.com/bare-swift/swift-zlib.git", from: "0.6.0"),
+        // swift-brotli intentionally pinned at 0.5 for v0.8 — true memory-streaming
+        // requires brotli v0.6 (state-machine refactor; Phase 36+ candidate).
+        // Partial-propagation acknowledgment: v0.8 is true-memory-streaming for
+        // deflate/gzip/zlib chains; brotli chains remain buffering-wrap until
+        // content-encoding v0.9 (post-brotli-v0.6).
         .package(url: "https://github.com/bare-swift/swift-brotli.git", from: "0.5.0")
     ],
     targets: [

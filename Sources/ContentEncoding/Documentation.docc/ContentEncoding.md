@@ -1,6 +1,6 @@
 # ``ContentEncoding``
 
-HTTP `Content-Encoding` multiplexer — decoder (v0.1+) + one-shot encoder (v0.2+) + streaming encoder (v0.5 single-coding, v0.6 multi-coding) + streaming decoder (v0.7 single- and multi-coding). Sendable, Foundation-free.
+HTTP `Content-Encoding` multiplexer — decoder (v0.1+) + one-shot encoder (v0.2+) + streaming encoder (v0.5 single-coding, v0.6 multi-coding) + streaming decoder (v0.7 single- and multi-coding; v0.8 inherits true memory-streaming for deflate/gzip/zlib chains; brotli still buffering until v0.9). Sendable, Foundation-free.
 
 ## Overview
 
