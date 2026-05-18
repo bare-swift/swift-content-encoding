@@ -25,4 +25,8 @@ public enum ContentEncodingError: Error, Equatable, Sendable {
     /// Encoder: ``ContentEncoding/Streaming/Encoder/finish()`` was called
     /// twice on the same encoder.
     case encoderFinished
+
+    /// Decoder: ``ContentEncoding/Streaming/Decoder/finish()`` was called
+    /// twice on the same decoder. Added in v0.7.
+    case decoderFinished
 }

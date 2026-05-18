@@ -1,6 +1,6 @@
 # ``ContentEncoding``
 
-HTTP `Content-Encoding` multiplexer — decoder (v0.1+) + one-shot encoder (v0.2+) + streaming encoder (v0.5 single-coding, v0.6 multi-coding). Sendable, Foundation-free.
+HTTP `Content-Encoding` multiplexer — decoder (v0.1+) + one-shot encoder (v0.2+) + streaming encoder (v0.5 single-coding, v0.6 multi-coding) + streaming decoder (v0.7 single- and multi-coding). Sendable, Foundation-free.
 
 ## Overview
 
@@ -44,6 +44,10 @@ Per [RFC-0014](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0014-phas
 
 - ``ContentEncoding/Streaming``
 - ``ContentEncoding/Streaming/Encoder``
+
+### Streaming decode (v0.7+)
+
+- ``ContentEncoding/Streaming/Decoder``
 
 ### Errors
 

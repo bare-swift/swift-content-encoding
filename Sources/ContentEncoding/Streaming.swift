@@ -220,3 +220,187 @@ extension ContentEncoding.Streaming {
         }
     }
 }
+
+extension ContentEncoding.Streaming {
+    /// Streaming HTTP `Content-Encoding` decoder (v0.7+).
+    ///
+    /// Dispatches to the streaming decoders in swift-brotli / swift-deflate
+    /// / swift-gzip / swift-zlib per the configured coding(s). v0.7
+    /// supports both single-coding and multi-coding chains via a
+    /// reverse-order finish-time cascade over the underlying v0.5+ codec
+    /// streaming decoders.
+    ///
+    /// Per RFC 9110 § 8.4, multi-coding values apply codings left-to-right
+    /// at encode time, so decoding applies them in **reverse** order. For
+    /// example, `"gzip, br"` means encode is `input → gzip → br → output`;
+    /// decode is `input → br-decode → gzip-decode → output`.
+    ///
+    /// Usage:
+    /// ```swift
+    /// var decoder = try ContentEncoding.Streaming.Decoder(
+    ///     contentEncoding: "gzip, br"
+    /// )
+    /// decoder.update(compressedChunk1)
+    /// decoder.update(compressedChunk2)
+    /// let plain = try decoder.finish()
+    /// ```
+    ///
+    /// **Supported codings (case-insensitive):**
+    /// - empty / whitespace header — identity passthrough.
+    /// - `identity` — passthrough.
+    /// - `gzip`, `x-gzip` — RFC 1952 (via swift-gzip v0.5+).
+    /// - `deflate`, `x-deflate` — zlib-framed DEFLATE (via swift-zlib v0.5+).
+    /// - `br` — Brotli (via swift-brotli v0.5+).
+    ///
+    /// After ``finish()`` the decoder is in the finished state.
+    /// ``update(_:)`` after finish is a silent no-op; double-finish throws
+    /// ``ContentEncodingError/decoderFinished``.
+    ///
+    /// **v0.7 implementation note (honest scope under limitation):** the
+    /// underlying codec streaming decoders (deflate / gzip / zlib v0.5
+    /// and brotli v0.5) buffer all compressed input internally and decode
+    /// one-shot at `finish()`. This decoder inherits that limitation —
+    /// `update(_:)` accumulates compressed bytes into the first-decoded
+    /// stage; the full decode chain runs at `finish()`. The
+    /// streaming-symmetric API surface is stable; true memory-streaming
+    /// decode lands when the underlying codec decoders gain state-machine
+    /// internals (v0.6+ on those packages; demand-driven).
+    public struct Decoder: Sendable {
+        private enum State: Sendable {
+            case open
+            case finished
+        }
+
+        /// One stage of the multi-coding decode pipeline. Identity is
+        /// implemented as a buffering passthrough so the cascade composes
+        /// uniformly.
+        private enum InnerCoding: Sendable {
+            case identity(Bytes)
+            case gzip(Gzip.Streaming.Decoder)
+            /// "deflate" Content-Encoding is zlib-framed DEFLATE per RFC 7230 § 4.2.2.
+            case deflate(Zlib.Streaming.Decoder)
+            case brotli(Brotli.Streaming.Decoder)
+
+            mutating func update(_ chunk: Bytes) {
+                switch self {
+                case .identity(var acc):
+                    acc.append(contentsOf: chunk.storage)
+                    self = .identity(acc)
+                case .gzip(var dec):
+                    dec.update(chunk)
+                    self = .gzip(dec)
+                case .deflate(var dec):
+                    dec.update(chunk)
+                    self = .deflate(dec)
+                case .brotli(var dec):
+                    dec.update(chunk)
+                    self = .brotli(dec)
+                }
+            }
+
+            mutating func finish() throws(ContentEncodingError) -> Bytes {
+                switch self {
+                case .identity(let acc):
+                    self = .identity(Bytes())
+                    return acc
+                case .gzip(var dec):
+                    do {
+                        let f = try dec.finish()
+                        self = .gzip(dec)
+                        return f
+                    } catch {
+                        throw .decodingFailed("gzip: \(error)")
+                    }
+                case .deflate(var dec):
+                    do {
+                        let f = try dec.finish()
+                        self = .deflate(dec)
+                        return f
+                    } catch {
+                        throw .decodingFailed("deflate: \(error)")
+                    }
+                case .brotli(var dec):
+                    do {
+                        let f = try dec.finish()
+                        self = .brotli(dec)
+                        return f
+                    } catch {
+                        throw .decodingFailed("br: \(error)")
+                    }
+                }
+            }
+        }
+
+        public let header: String
+
+        /// Stages in **decode order** (reverse of encode/parse order).
+        /// `pipeline[0]` is the last-applied coding (decoded first; receives
+        /// raw compressed input via `update(_:)`); `pipeline[N-1]` is the
+        /// first-applied coding (decoded last; produces final plaintext).
+        private var pipeline: [InnerCoding]
+        private var state: State
+
+        public init(
+            contentEncoding header: String
+        ) throws(ContentEncodingError) {
+            self.header = header
+
+            let codings = ContentEncoding.parseCodings(header)
+            var stages: [InnerCoding] = []
+            if codings.isEmpty {
+                stages.append(.identity(Bytes()))
+            } else {
+                stages.reserveCapacity(codings.count)
+                // Build in REVERSE coding order so pipeline[0] is decoded first.
+                for coding in codings.reversed() {
+                    switch coding {
+                    case "identity":
+                        stages.append(.identity(Bytes()))
+                    case "gzip", "x-gzip":
+                        stages.append(.gzip(Gzip.Streaming.Decoder()))
+                    case "deflate", "x-deflate":
+                        stages.append(.deflate(Zlib.Streaming.Decoder()))
+                    case "br":
+                        stages.append(.brotli(Brotli.Streaming.Decoder()))
+                    default:
+                        throw .unsupportedEncoding(coding)
+                    }
+                }
+            }
+            self.pipeline = stages
+            self.state = .open
+        }
+
+        /// Feed a chunk of compressed input. Routes to `pipeline[0]` (the
+        /// last-applied coding, which is decoded first). Subsequent stages
+        /// receive their input at `finish()` time from the prior stage's
+        /// `finish()` output. Empty chunk = no-op.
+        /// Silent no-op when called after ``finish()``.
+        public mutating func update(_ chunk: Bytes) {
+            guard case .open = state else { return }
+            if chunk.isEmpty { return }
+            pipeline[0].update(chunk)
+        }
+
+        /// Run the decode chain in reverse-coding order (i.e., pipeline
+        /// order). Each stage's `finish()` output feeds the next stage's
+        /// `update(_:)` + `finish()`. The last stage's `finish()` output is
+        /// the fully-decoded plaintext. Throws
+        /// ``ContentEncodingError/decoderFinished`` on double-call. Throws
+        /// other ``ContentEncodingError`` cases if any underlying codec
+        /// decoder rejects its input.
+        public mutating func finish() throws(ContentEncodingError) -> Bytes {
+            guard case .open = state else { throw .decoderFinished }
+            state = .finished
+
+            var current = Bytes()
+            for i in 0..<pipeline.count {
+                if i > 0 {
+                    pipeline[i].update(current)
+                }
+                current = try pipeline[i].finish()
+            }
+            return current
+        }
+    }
+}

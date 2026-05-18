@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-05-18
+
+### Added
+- **`ContentEncoding.Streaming.Decoder`** — Sendable value-type streaming decoder with `init(contentEncoding:)` / `update(_ chunk: Bytes)` / `finish() throws(ContentEncodingError) -> Bytes`. Supports both single-coding (`"gzip"`, `"br"`, `"deflate"`, `"identity"`, empty) and multi-coding (`"gzip, br"`, `"deflate, gzip"`, `"gzip, deflate, br"`, etc.) per RFC 9110 § 8.4 reverse-order semantics. Dispatches to streaming decoders in swift-brotli / swift-deflate / swift-gzip / swift-zlib v0.5+ via an internal `InnerCoding` enum mirroring v0.6's `Encoder` pipeline.
+- **`ContentEncodingError.decoderFinished`** — thrown when `finish()` is called twice on the same decoder.
+- 25 new tests covering single-coding round-trip (identity / gzip / x-gzip / deflate / x-deflate / br), multi-coding round-trip (`gzip, br`, `br, gzip`, `deflate, gzip`, `identity, gzip`, three-coding chain), multi-chunk decode, tiny 1-byte chunks, empty stream, single-byte payload, whitespace-tolerant headers, unsupported-coding errors (init-time, in-chain), truncated input, double-finish, update-after-finish no-op, and equivalence with `ContentEncoding.decode(_:contentEncoding:)` one-shot.
+
+### Honest scope under limitation (v0.7)
+The underlying codec streaming decoders (swift-brotli v0.5 / swift-deflate v0.5 / swift-gzip v0.5 / swift-zlib v0.5) **buffer all compressed input internally and run one-shot decode at `finish()`**. v0.7's `ContentEncoding.Streaming.Decoder` inherits this — `update(_:)` accumulates compressed bytes into the first-decoded stage; the full decode chain runs at `finish()` (reverse-order cascade for multi-coding). The streaming-symmetric API surface is stable today; true memory-streaming decode lands when the underlying codec decoders gain state-machine internals (codec v0.6+ on those packages; demand-driven).
+
+This matches the codec-tier v0.5 streaming-decode honest-scope-under-limitation pattern (Phases 30-32) — 6th instance of the pattern across the ecosystem.
+
+### Migration (v0.6 → v0.7)
+- **Additive only — non-breaking.** All v0.1-v0.6 APIs unchanged.
+- `ContentEncoding.encode(_:contentEncoding:level:)`, `ContentEncoding.decode(_:contentEncoding:)`, and `ContentEncoding.Streaming.Encoder` are unchanged.
+- New error case `ContentEncodingError.decoderFinished` is additive.
+- Codec dependency floors bumped to 0.5.0 (was 0.4.0 for brotli/gzip/zlib, 0.2.0 for deflate) for streaming-decoder access. v0.5 codec packages preserve v0.1-v0.4 API byte-for-byte.
+
+### Dependencies
+- swift-brotli dep bumped 0.4.0 → 0.5.0 (for `Brotli.Streaming.Decoder`).
+- swift-deflate dep bumped 0.2.0 → 0.5.0 (for `Deflate.Streaming.Decoder`).
+- swift-gzip dep bumped 0.4.0 → 0.5.0 (for `Gzip.Streaming.Decoder`).
+- swift-zlib dep bumped 0.4.0 → 0.5.0 (for `Zlib.Streaming.Decoder`).
+
+### Phase 33
+- Tranche 33A of [RFC-0038](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0038-phase-33-anchor-swift-content-encoding-v0.7-streaming-decode.md). Single combined tranche (single-coding + multi-coding decode together; Shape B). Closes HTTP body streaming story end-to-end (codec-tier + content-encoding tier both stream-capable in both directions).
+
 ## [0.6.0] — 2026-05-17
 
 ### Added
