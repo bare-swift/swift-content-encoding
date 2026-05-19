@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-05-19
+
+### Inherited (uniform propagation)
+- **True memory-streaming inflate for `br` (brotli) coding via swift-brotli v0.6.** swift-brotli bumped 0.5 → 0.6 in v0.9. The v0.8 partial-propagation acknowledgment is retired: `ContentEncoding.Streaming.Decoder` configurations using **any** supported coding — single-coding (`identity`, `gzip`, `x-gzip`, `deflate`, `x-deflate`, `br`) or multi-coding chains (including chains that contain `br`) — now run with true memory-streaming inflate underneath. Adopters get this for free via dep bump — zero code changes; public API surface byte-for-byte preserved.
+
+### Codec-tier true-memory-streaming story COMPLETE end-to-end
+v0.9 closes the 7-phase codec-tier true-memory-streaming arc:
+- Phase 30: deflate v0.5 streaming-decode API surface (foundation).
+- Phase 31: gzip v0.5 + zlib v0.5 streaming-decode (buffering-wrap inheritance).
+- Phase 32: brotli v0.5 streaming-decode (buffering-wrap).
+- Phase 33: content-encoding v0.7 single + multi-coding streaming-decode (cascaded; buffering-wrap inheritance).
+- Phase 34: deflate v0.6 **true memory-streaming** via state-machine refactor.
+- Phase 35: gzip v0.6 + zlib v0.6 + content-encoding v0.8 — true-memory-streaming inheritance for deflate/gzip/zlib (brotli held at 0.5).
+- Phase 36: brotli v0.6 **true memory-streaming** via state-machine refactor.
+- **Phase 37 (here): content-encoding v0.9 — uniform brotli propagation; story complete.**
+
+The 6-instance honest-scope-under-limitation pattern from Phases 25-33 is now fully RESOLVED.
+
+### Internal
+- swift-brotli dep floor: 0.5.0 → 0.6.0. (deflate/gzip/zlib already at 0.6 from v0.8.)
+- Public API surface byte-for-byte unchanged. All 91 v0.8 tests pass without modification.
+
+### Migration (v0.8 → v0.9)
+- **Additive only — non-breaking.** All v0.1-v0.8 APIs unchanged.
+- Adopters consuming `br`-containing multi-coding chains automatically benefit from true memory-streaming end-to-end with zero code changes.
+
+### Phase 37
+- Tranche 37A of [RFC-0042](https://github.com/bare-swift/bare-swift/blob/main/rfcs/0042-phase-37-anchor-swift-content-encoding-v0.9-uniform-brotli-propagation.md). Caps the 7-phase codec-tier true-memory-streaming arc cleanly.
+
 ## [0.8.0] — 2026-05-18
 
 ### Inherited (partial propagation)
